@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BRICKBREAKER</title>
+    </head>
+    <body>
+        <canvas id="gameCanvas" height="600" width="1000"></canvas>
+    </body>
+    <script>
+        /*works fine shows win and lose screeens too has 36 bricks. corrected mouse positioning and ball now does not go inside paddle
+        added live scoring
+            need to add:
+            -some graphics to look better
+            -a screen to start the game 
+            -a pause button and hence a resume button
+            -make it mobile compatible(working with touch)
+            -levels
+            -some upgraded tiles
+        */
+        
+        
+        var canvas;
+        var canvasContext;
+        
+        var ballRadius=10;
+        var ballX=500;
+        var ballSpeedX=7;
+        var ballY=570;
+        var ballSpeedY=-7;
+        var ballResetSpeedX=-7;
+        
+        var paddleX=450;
+        var paddleY=590;//never changes
+        var paddleWidth=100;
+        var dampningFactor=0.35;//to change the speed of ball when it hits edges of paddle;
+        
+        var bricksRows=4;
+        var bricksColumn=10;
+        var brickWidth=100+5;
+        var brickHeight=20+5;
+        var brickColor='white';
+        var brickPaddingX=5;
+        var brickPaddingY=5;
+        
+        
+        var bricksCounter=bricksRows*(bricksColumn-1); // taking side bricks padding into account       
+        var lives= 3;
+        var showWinScreen=false;
+        var showLoseScreen=false;
+        var score=0;
+        //array storing bricks
+        var bricks=[];
+        for(var r=0;r<bricksRows;r++)
+            { bricks [r]=[];
+                for(var c=0;c<bricksColumn;c++)
+                    bricks [r][c]={x:0, y:0, status: 1};/*objects where x=xcordinate, y=ycoordinate and status tells whether
+                                                            ball hits it or not*/ 
+            }
+        
+        
+        
+        
+       window.onload= function a(){
+            canvas=document.getElementById('gameCanvas');
+            canvasContext=canvas.getContext('2d');
+                //console.log("onload");
+                drawEverything();
+            var framesPerSecond =35;
+            setInterval(function callfns(){
+                if(showWinScreen)
+                    {
+                        showingWinScreen();
+                    }
+               else if(showLoseScreen)
+                    {
+                        showingLoseScreen();
+                    }
+                else
+                {
+                    moveEverything();
+                    drawEverything();
+                }
+            },1000/framesPerSecond);
+        
+            //eventlistner to catch event mouse move then call a function when its pressed here calling an inline function.
+        canvas.addEventListener('mousemove',  function(evt){
+                                var k=calculateMousePositionX(evt)-paddleWidth/2;
+                                    if(k>canvas.width-paddleWidth)
+                                        paddleX=canvas.width-paddleWidth;
+                                else if(k<0)
+                                      paddleX=0;
+                                else
+                                {paddleX=k;}
+                                //  console.log(paddleX);
+                            })
+     
+           
+       }
+       
+       
+        
+       
+       
+       //Since we required to create too many rectangles for bricks thus a seperate function
+        function createRect(originX,originY,length,breadth,color){
+                //console.log("create rect");
+                canvasContext.fillStyle=color;
+                canvasContext.fillRect(originX,originY,length,breadth);
+           }
+        
+       
+        
+        function showingLoseScreen()
+        {  // console.log("lose");
+            createRect(0,0,canvas.width,canvas.height,'black');
+            canvasContext.fillStyle='white';
+            canvasContext.fillText("You lose. click to continue",canvas.width/2-150,canvas.height/2);
+            canvas.addEventListener('mousedown',clickFn);
+        }
+        
+        function showingWinScreen(){
+          //  console.log("win");
+             createRect(0,0,canvas.width,canvas.height,'black');
+            canvasContext.fillStyle='white';
+            canvasContext.fillText("You win. click to continue",canvas.width/2-150,canvas.height/2);
+            canvas.addEventListener('mousedown',clickFn);    
+        }
+        
+        
+        
+        
+        function drawEverything(){
+            //canvas
+            createRect(0,0,canvas.width,canvas.height,'black');
+            
+            
+            //lives left and score
+            score=((36-bricksCounter)*100);
+            canvasContext.fillStyle='white';
+            canvasContext.font="16px Quicksand";
+            canvasContext.fillText("lives left  :"+lives,canvas.width-150,canvas.height-20);
+            canvasContext.fillText("Score   :"+score,50,canvas.height-20);
+            
+              //ball
+            canvasContext.fillStyle='white';
+            //allows us to define shape like arcs
+            canvasContext.beginPath();
+            //circle shape:
+            canvasContext.arc(ballX, ballY, ballRadius, 0, Math.PI*2,true);
+            //fills the path ie arc
+            canvasContext.fill();
+            //console.log("create ball");
+            
+            
+            //paddle
+            createRect(paddleX,paddleY,100,10,'white');
+            
+            
+            //bricks
+            //console.log("enter the create bricks function");
+            createBricks();
+        }
+        
+        
+        
+        
+        function detectCollision(brick){
+            if(brick.status==0)
+                return 0;
+            
+            if( (ballX < (brick.x - brickPaddingX)) && (ballX > (brick.x - brickWidth - brickPaddingX)) && 
+                (ballY > (brick.y + brickPaddingY)) && (ballY < (brick.y + brickHeight + brickPaddingY)) )
+                        //observe the above condition carefully
+                {  // console.log(brick.x,brick.y,ballX,ballY, brick.status);       
+                    //console.log("brick destroyed");
+                    ballSpeedY=-ballSpeedY;
+                    bricksCounter=bricksCounter-1;
+                    //console.log(bricksCounter);
+                    if(bricksCounter==0)
+                        {
+                            showWinScreen=true;
+                        }
+                    return 0;
+                    
+                }
+            else
+                return 1;
+        }
+        
+        
+        
+        
+        function createBricks()
+        {  
+            var x=brickPaddingX;var y=brickPaddingY;
+            var c;var r;
+            for(r=0;r<bricksRows;r++)
+                {
+                    for(c=0;c<bricksColumn-1;c++)
+                        {   
+                            bricks[r][c].status=detectCollision(bricks[r][c]);
+                            if(bricks[r][c].status==1)
+                            {createRect(x,y,brickWidth,brickHeight,brickColor);}
+                            
+                            x=x+brickWidth+brickPaddingX;
+                            bricks[r][c].x=x;
+                            bricks[r][c].y=y;
+                            //console.log(x,y);
+                        }
+                    y=y+brickHeight+brickPaddingY;
+                    x=brickPaddingX;
+                    //console.log(y);
+                }
+         
+        }
+        
+        
+        
+        function moveEverything(){
+            
+            ballX+=ballSpeedX;
+            ballY+=ballSpeedY;
+            //collision from edges
+            //left wall
+            if(ballX-ballRadius<=0)
+                {
+                    ballSpeedX=-ballSpeedX;
+                }
+            //right wall
+            if(ballX+ballRadius>=canvas.width)
+                {
+                    ballSpeedX=-ballSpeedX;
+                }
+            //top
+            if(ballY<=0)
+                {
+                    ballSpeedY=-ballSpeedY;
+                }
+            //bottom
+                    // if ball hit paddle
+                    if(ballX>=paddleX && ballX<=paddleX+paddleWidth && ballY>=canvas.height-10)//to check if ball hits paddle at height canvas.height-10
+                        {
+                            ballSpeedY=-ballSpeedY;
+                            var diff=ballX-(paddleX+paddleWidth/2);
+                            ballSpeedX =diff*dampningFactor;
+                        }
+                    else 
+                    {if(ballY>=canvas.height)//agar ball hit nhi karti paddle
+                        {lives=lives-1;
+                         //console.log(lives);
+                            if(lives==0)
+                                {   
+                                showLoseScreen=true;
+                                }
+            
+                            ballAndPaddleReset();
+                        }   }
+                            
+        }
+        
+        
+        
+        function ballAndPaddleReset(){
+            // one life reduces
+            paddleX=canvas.width/2-paddleWidth/2; // to reset the paddle in center
+            ballX=canvas.width/2;
+            ballY=canvas.height-15;//to bring ball just above the paddle
+            ballSpeedX=-ballResetSpeedX;// to neglect the changes in speed due to dampning factor
+            ballResetSpeedX=-ballResetSpeedX;//done to change the initial direction of ball after every reset;
+            ballSpeedY=-5;//move upwards
+        }
+    
+        
+        
+        function calculateMousePositionX(evt){
+            //evt is the event fired when a mouse moves. its coordinates are given as a part of it
+            var rect= canvas.getBoundingClientRect();
+            //rect gives us the canvas area -black one
+            /*var mouseX= evt.clientX
+           
+              clientx gives x coordinates of mouse in the canvas*/
+        
+            var mouseX= evt.clientX;
+            return mouseX;
+        }
+        
+        
+        function clickFn(){
+            showLoseScreen=false;
+            showWinScreen=false;
+            bricksCounter=bricksColumn*bricksRows;
+            lives=3;
+            score=0;
+            ballAndPaddleReset();
+        for(var r=0;r<bricksRows;r++)
+            { 
+                for(var c=0;c<bricksColumn;c++)
+                    bricks [r][c]={x:0, y:0, status: 1};// reset all bricks 
+            }
+        
+        }
+        
+        
+        
+    </script>
+</html>
